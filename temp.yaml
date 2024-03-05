@@ -1,0 +1,105 @@
+version: '3.9'
+
+x-repmgr-variables: &repmgr-variables
+  POSTGRESQL_POSTGRES_PASSWORD: adminpassword
+  POSTGRESQL_DATABASE: postgres
+  POSTGRESQL_USERNAME: myuser
+  POSTGRESQL_PASSWORD: mypassword
+  POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: 1
+  REPMGR_PRIMARY_HOST: pg-0
+  REPMGR_PARTNER_NODES: pg-0,pg-1:5432
+  REPMGR_USERNAME: repmgr
+  REPMGR_PASSWORD: repmgrpassword
+
+
+services:
+  pg-0:
+    image: bitnami/postgresql-repmgr:14
+    ports:
+      - 5432
+    environment:
+      <<: *repmgr-variables
+      REPMGR_NODE_NAME: pg-0
+      REPMGR_NODE_NETWORK_NAME: pg-0
+    networks:
+      postgres-network:
+        ipv4_address: 172.25.0.2
+    volumes:
+      - pg_0_data:/bitnami/postgresql
+
+  pg-1:
+    image: bitnami/postgresql-repmgr:14
+    ports:
+      - 5432
+    environment:
+      <<: *repmgr-variables
+      REPMGR_NODE_NAME: pg-1
+      REPMGR_NODE_NETWORK_NAME: pg-1
+    networks:
+      postgres-network:
+        ipv4_address: 172.25.0.3
+    volumes:
+      - pg_1_data:/bitnami/postgresql
+
+  pgpool:
+    image: bitnami/pgpool:4
+    ports:
+      - 5432:5432
+    networks:
+      postgres-network:
+        ipv4_address: 172.25.0.4
+    environment:
+      - PGPOOL_BACKEND_NODES=0:172.25.0.2:5432,1:172.25.0.3:5432
+      - PGPOOL_SR_CHECK_USER=repmgr
+      - PGPOOL_SR_CHECK_PASSWORD=repmgrpassword
+      - PGPOOL_POSTGRES_USERNAME=postgres
+      - PGPOOL_POSTGRES_PASSWORD=adminpassword
+      - PGPOOL_ADMIN_USERNAME=admin
+      - PGPOOL_ADMIN_PASSWORD=adminpassword
+      - PGPOOL_ENABLE_LDAP=no
+      - PGPOOL_ENABLE_LOAD_BALANCING=no
+      - POSTGRESQL_USERNAME=keycloak
+      - POSTGRESQL_PASSWORD=kcpassword
+      - POSTGRESQL_DATABASE=keycloak
+    healthcheck:
+      test: ["CMD", "/opt/bitnami/scripts/pgpool/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  keycloak:
+    image: quay.io/keycloak/keycloak:legacy
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: pgpool
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_SCHEMA: public
+      DB_PASSWORD: kcpassword
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: Pa55w0rd
+    ports:
+      - 8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/auth/realms/master"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - pgpool
+    networks:
+      postgres-network:
+        ipv4_address: 172.25.0.5
+
+volumes:
+  pg_0_data:
+    driver: local
+  pg_1_data:
+    driver: local
+
+networks:
+  postgres-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16
