@@ -1,0 +1,115 @@
+version: '3.3'
+
+services:
+  pg:
+    image: bitnami/postgresql-repmgr:14
+    container_name: pg
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: 1
+      POSTGRESQL_POSTGRES_PASSWORD: adminpassword
+      POSTGRESQL_DATABASE: keycloak
+      POSTGRESQL_USERNAME: keycloak
+      POSTGRESQL_PASSWORD: kcpassword
+      REPMGR_USERNAME: repmgr
+      REPMGR_PASSWORD: repmgrpassword
+      REPMGR_PRIMARY_HOST: {{ groups['all'][0] }}
+      REPMGR_PRIMARY_PORT: 5432
+      REPMGR_PARTNER_NODES: "{{ groups['all'] | join(',') }}"
+      REPMGR_NODE_NAME: "{{ inventory_hostname }}"
+      REPMGR_NODE_NETWORK_NAME: "{{ inventory_hostname }}"
+    networks:
+      - kc-network
+
+    volumes:
+      - "{{ pg_data_dir }}:/bitnami/postgresql"
+
+
+  pgpool:
+    image: bitnami/pgpool:4
+    container_name: pgpool
+    restart: always
+    ports:
+      - "5432"
+    environment:
+      PGPOOL_SR_CHECK_USER: repmgr
+      PGPOOL_SR_CHECK_PASSWORD: repmgrpassword
+      PGPOOL_POSTGRES_USERNAME: postgres
+      PGPOOL_POSTGRES_PASSWORD: adminpassword
+      PGPOOL_ADMIN_USERNAME: admin
+      PGPOOL_ADMIN_PASSWORD: adminpassword
+      PGPOOL_ENABLE_LDAP: "no"
+      PGPOOL_ENABLE_LOAD_BALANCING: "no"
+      PGPOOL_BACKEND_NODES: "{% for item in groups['all'] %}{{ loop.index0 }}:{{ hostvars[item]['ansible_host'] }}{{ ',' if not loop.last }}{% endfor %}"
+      PGPOOL_AUTO_FAILBACK: "yes"
+      PGPOOL_BACKEND_APPLICATION_NAMES: "{{ groups['all'] | join(',') }}"
+
+
+    networks:
+      - kc-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:legacy
+    container_name: keycloak
+    restart: always
+    environment:
+      DB_VENDOR: POSTGRES
+      DB_ADDR: pgpool
+      DB_DATABASE: keycloak
+      DB_USER: postgres
+      DB_SCHEMA: public
+      DB_PASSWORD: adminpassword
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: Pa55w0rd
+      PROXY_ADDRESS_FORWARDING: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pgpool
+    networks:
+      - kc-network
+      
+{% if use_custom_certs == "no" %}
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    restart: 
+    volumes:
+      - ./certs/letsencrypt:/etc/letsencrypt
+      - /tmp/acme-challenge:/tmp/acme-challenge
+    entrypoint: ""
+    command: sh -c "certbot certonly -n --standalone -w /tmp/acme-challenge -d {{ hostvars[inventory_hostname]['domain'] }} --text --agree-tos --rsa-key-size 4096 --verbose --keep-until-expiring --preferred-challenges=http {% if letsencrypt_email %} -m {{ letsencrypt_email }}{% endif %}"
+    ports:
+      - "80:80"
+    environment:
+      - TERM=xterm
+    networks:
+      - kc-network
+
+{% endif %}
+
+  nginx:
+    image: nginx
+    container_name: nginx
+    restart: always
+    ports:
+      - "443:443"
+    depends_on:
+      - keycloak
+    networks:
+      - kc-network
+    volumes:
+      - ./conf/nginx.conf:/etc/nginx/nginx.conf
+{% if use_custom_certs == "yes" %}
+      - ./certs/custom/{{ hostvars[inventory_hostname]['domain'] }}:/etc/ssl/custom/{{ hostvars[inventory_hostname]['domain'] }}
+{% else %}
+      - ./certs/letsencrypt:/etc/letsencrypt
+{% endif %}
+
+
+networks:
+  kc-network:
+    driver: bridge

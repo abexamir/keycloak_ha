@@ -1,4 +1,4 @@
-version: '3.9'
+version: '3'
 
 x-repmgr-variables: &repmgr-variables
   POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: 1
@@ -23,7 +23,7 @@ services:
       REPMGR_NODE_NETWORK_NAME: pg-0
     networks:
       postgres-network:
-        ipv4_address: 172.25.0.2
+        ipv4_address: 10.143.0.2
     volumes:
       - pg_0_data:/bitnami/postgresql
 
@@ -37,7 +37,7 @@ services:
       REPMGR_NODE_NETWORK_NAME: pg-1
     networks:
       postgres-network:
-        ipv4_address: 172.25.0.3
+        ipv4_address: 10.143.0.3
     volumes:
       - pg_1_data:/bitnami/postgresql
 
@@ -47,9 +47,9 @@ services:
       - 5432:5432
     networks:
       postgres-network:
-        ipv4_address: 172.25.0.4
+        ipv4_address: 10.143.0.4
     environment:
-      - PGPOOL_BACKEND_NODES=0:172.25.0.2:5432,1:172.25.0.3:5432
+      - PGPOOL_BACKEND_NODES=0:10.143.0.2:5432,1:10.143.0.3:5432
       - PGPOOL_SR_CHECK_USER=repmgr
       - PGPOOL_SR_CHECK_PASSWORD=repmgrpassword
       - PGPOOL_POSTGRES_USERNAME=postgres
@@ -85,43 +85,7 @@ services:
       - pgpool
     networks:
       postgres-network:
-        ipv4_address: 172.25.0.5
-  keycloak2:
-    image: quay.io/keycloak/keycloak:legacy
-    environment:
-      DB_VENDOR: POSTGRES
-      DB_ADDR: pgpool
-      DB_DATABASE: keycloak
-      DB_USER: postgres
-      DB_SCHEMA: public
-      DB_PASSWORD: adminpassword
-      KEYCLOAK_USER: admin
-      KEYCLOAK_PASSWORD: Pa55w0rd
-    ports:
-      - 8080
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/auth/realms/master"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    depends_on:
-      - pgpool
-    networks:
-      postgres-network:
-        ipv4_address: 172.25.0.7
-
-  pgadmin:
-    image: dpage/pgadmin4
-    ports:
-      - 5050
-    environment:
-      PGADMIN_DEFAULT_EMAIL: abexamir@gmail.com
-      PGADMIN_DEFAULT_PASSWORD: adminpassword
-    depends_on:
-      - pgpool
-    networks:
-      postgres-network:
-        ipv4_address: 172.25.0.6
+        ipv4_address: 10.143.0.5
 
 volumes:
   pg_0_data:
@@ -135,4 +99,4 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 172.25.0.0/16
+        - subnet: 10.143.0.0/24
