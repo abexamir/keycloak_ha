@@ -22,6 +22,12 @@
         state: present
       when: ansible_os_family == "Debian"
 
+    - name: Enable and start docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
     - name: Set user home directory
       set_fact:
         ansible_user_home: "/{{ 'root' if ansible_user == 'root' else 'home/' + ansible_user }}"
@@ -48,28 +54,10 @@
         src: "./conf/nginx.conf.j2"
         dest: "/{{ ansible_user_home }}/{{ deployment_name }}/conf/nginx.conf"
 
-    - name: create directory for certificates
-      file:
-        path: "{{ ansible_user_home }}/{{ deployment_name }}/certs"
-        state: directory
-
-    - name: create directory for custom certificates
-      file:
-        path: "{{ ansible_user_home }}/{{ deployment_name }}/certs/custom/{{ hostvars[inventory_hostname]['domain'] }}"
-        state: directory
-      when: use_custom_certs
-
-    - name: copy custom certificate fullchain
-      template:
-        src: "./certs/custom/{{ hostvars[inventory_hostname]['domain'] }}/fullchain.pem"
-        dest: "{{ ansible_user_home }}/{{ deployment_name }}/certs/custom/{{ hostvars[inventory_hostname]['domain'] }}/fullchain.pem"
-      when: use_custom_certs
-
-    - name: copy custom certificate privkey
-      template:
-        src: "./certs/custom/{{ hostvars[inventory_hostname]['domain'] }}/privkey.pem"
-        dest: "{{ ansible_user_home }}/{{ deployment_name }}/certs/custom/{{ hostvars[inventory_hostname]['domain'] }}/privkey.pem"
-      when: use_custom_certs
+    - name: copy certificates directory
+      copy:
+        src: "certs/"
+        dest: "/{{ ansible_user_home }}/{{ deployment_name }}/certs/"
 
     - name: Copy Docker Compose file
       template:
@@ -77,12 +65,23 @@
         dest: "/{{ ansible_user_home }}/{{ deployment_name }}/docker-compose.yml"
       delegate_to: "{{ inventory_hostname }}"
 
+    - name: make deployment directory readable for all
+      file:
+        path: "{{ ansible_user_home }}/{{ deployment_name }}"
+        mode: 0755
+        recurse: yes
+
+    - name: generate haproxy entry
+      template:
+        src: "haproxy.cfg.j2"
+        dest: "/{{ ansible_user_home }}/{{ deployment_name }}/haproxy.cfg"
+
     - name: Start services with Docker Compose
       command: docker-compose up -d
       args:
         chdir: "/{{ ansible_user_home }}/{{ deployment_name }}"
       become_user: "{{ ansible_user }}"
-
+    
   vars:
     pg_data_dir: "{{ ansible_user_home }}/{{ deployment_name }}/pg_data"
 

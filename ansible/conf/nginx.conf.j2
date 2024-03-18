@@ -25,6 +25,14 @@ http {
     include /etc/nginx/conf.d/*.conf;
 
     server {
+        listen 8080;
+        server_name {{ hostvars[inventory_hostname]['domain'] }};
+        location / {
+            proxy_pass         http://keycloak:8080;
+        }
+    }
+
+    server {
         listen 443 ssl;
         server_name {{ hostvars[inventory_hostname]['domain'] }};
 
@@ -55,4 +63,30 @@ http {
             proxy_busy_buffers_size   256k;
         }
     }
+
+
+{% if global_domain %}
+    server {
+        listen 8443 ssl;
+        server_name {{ global_domain }};
+
+        ssl_certificate /etc/ssl/custom/{{ global_domain }}/fullchain.pem;
+        ssl_certificate_key /etc/ssl/custom/{{ global_domain }}/privkey.pem;
+
+        location / {
+            proxy_pass         http://keycloak:8080;
+            proxy_redirect     off;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Real-IP $remote_addr;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Host $server_name;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   X-Forwarded-Port $server_port;
+            proxy_set_header   X-Forwarded-Server $host;
+	        proxy_buffer_size   128k;
+            proxy_buffers   4 256k;
+            proxy_busy_buffers_size   256k;
+        }
+    }
+{% endif %}
 }

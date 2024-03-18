@@ -1,0 +1,13 @@
+listen {{ deployment_name }}
+  bind 0.0.0.0:8443 
+  balance leastconn
+  timeout client 180s
+  timeout server 180s
+  mode  tcp 
+  option  tcplog 
+  option log-health-checks
+  {% for host in groups['all'] %}
+  server {{ global_domain }} {{ host }}:8443 check  inter 500 fall 5 rise 5
+  {% endfor %}
+
+
