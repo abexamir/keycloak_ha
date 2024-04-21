@@ -1,0 +1,84 @@
+---
+- name: Deploy services on VMs
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    # - name: Update system packages
+    #   apt:
+    #     update_cache: yes
+    #   when: ansible_os_family == "Debian"
+    #
+    # - name: Install Docker
+    #   apt:
+    #     name: docker.io
+    #     state: present
+    #   when: ansible_os_family == "Debian"
+    #
+    # - name: Install Docker Compose
+    #   apt:
+    #     name: docker-compose
+    #     state: present
+    #   when: ansible_os_family == "Debian"
+    #
+    # - name: Enable and start docker
+    #   service:
+    #     name: docker
+    #     state: started
+    #     enabled: yes
+
+    - name: create directory for this deployment
+      file:
+        path: "{{ deployment_dir }}"
+        state: directory
+
+    - name: create directory for postgres data
+      file:
+        path: "{{ pg_data_dir }}"
+        state: directory
+        owner: 1001
+        group: 1001
+    
+    - name: create conf directory
+      file:
+        path: "{{ deployment_dir }}/conf"
+        state: directory
+
+    - name: copy nginx.conf
+      template:
+        src: "./conf/nginx.conf.j2"
+        dest: "{{ deployment_dir }}/conf/nginx.conf"
+
+    - name: copy certificates directory
+      copy:
+        src: "certs/"
+        dest: "{{ deployment_dir }}/certs/"
+
+    - name: Copy Docker Compose file
+      template:
+        src: "docker-compose.j2"
+        dest: "{{ deployment_dir }}/docker-compose.yml"
+      delegate_to: "{{ inventory_hostname }}"
+
+    - name: make deployment directory readable for all
+      file:
+        path: "{{ deployment_dir }}"
+        mode: 0755
+        recurse: yes
+
+    - name: generate haproxy entry
+      template:
+        src: "haproxy.cfg.j2"
+        dest: "{{ deployment_dir }}/haproxy.cfg"
+
+    - name: Start services with Docker Compose
+      command: docker-compose up -d
+      args:
+        chdir: "{{ deployment_dir }}"
+      become: yes
+    
+  vars:
+    deployment_dir: "/opt/{{ deployment_name }}"
+    pg_data_dir: "{{ deployment_dir }}/pg_data"
+

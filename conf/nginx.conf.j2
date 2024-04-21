@@ -29,6 +29,27 @@ http {
         server_name {{ hostvars[inventory_hostname]['domain'] }};
         location / {
             proxy_pass         http://keycloak:8080;
+            proxy_redirect     off;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Real-IP $remote_addr;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Host $server_name;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   X-Forwarded-Port $server_port;
+            proxy_set_header   X-Forwarded-Server $host;
+	        proxy_buffer_size   128k;
+            proxy_buffers   4 256k;
+            proxy_busy_buffers_size   256k;
+        }
+        location /pghc {
+            proxy_pass         http://pghc:8080;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Real-IP $remote_addr;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Host $server_name;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   X-Forwarded-Port $server_port;
+            proxy_set_header   X-Forwarded-Server $host;
         }
     }
 
@@ -62,6 +83,16 @@ http {
             proxy_buffers   4 256k;
             proxy_busy_buffers_size   256k;
         }
+        location /pghc {
+            proxy_pass         http://pghc:8080;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Real-IP $remote_addr;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Host $server_name;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   X-Forwarded-Port $server_port;
+            proxy_set_header   X-Forwarded-Server $host;
+        }
     }
 
 
@@ -86,6 +117,16 @@ http {
 	        proxy_buffer_size   128k;
             proxy_buffers   4 256k;
             proxy_busy_buffers_size   256k;
+        }
+        location /pghc {
+            proxy_pass         http://pghc:8080;
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Real-IP $remote_addr;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header   X-Forwarded-Host $server_name;
+            proxy_set_header   X-Forwarded-Proto $scheme;
+            proxy_set_header   X-Forwarded-Port $server_port;
+            proxy_set_header   X-Forwarded-Server $host;
         }
     }
 {% endif %}

@@ -1,0 +1,16 @@
+all:
+  hosts:
+    kc-2:
+      ansible_host: 172.28.40.211
+      ansible_port: 8933
+      domain: paas-kc2.asadc.local
+  vars:
+    custom_image_repo: "repo.asax.ir/"
+    deployment_name: pg_kc_ha
+    use_custom_certs: "yes"  # "yes" or "no", if "yes", you should provide certificates in certs directory
+    letsencrypt_email: "abexamir@gmail.com"
+    global_domain: "paas-kcx.asadc.local" # the single entry point of the cluster
+      #    custom_docker_network_cidr: "10.143.0.0/16"
+    loadbalancer_mode: "tcp"
+
+

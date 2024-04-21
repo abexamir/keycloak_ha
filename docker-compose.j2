@@ -2,13 +2,13 @@ version: '3.3'
 
 services:
   pg:
-    image: bitnami/postgresql-repmgr:14
+    image: {{ custom_image_repo }}bitnami/postgresql-repmgr:14
     container_name: pg
     restart: always
     ports:
       - "5432:5432"
     environment:
-      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: 1
+      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS: 0
       POSTGRESQL_POSTGRES_PASSWORD: adminpassword
       POSTGRESQL_DATABASE: keycloak
       POSTGRESQL_USERNAME: keycloak
@@ -31,9 +31,20 @@ services:
       - "{{ item }}:{{ hostvars[item]['ansible_host'] }}"
 {% endfor %}
 
+  pghc:
+    image: {{ custom_image_repo }}abexamir/pghc:f58e74adaf89127b4c3dc406dc12d596ada9b96c
+    container_name: pghc
+    expose:
+      - "8080"
+    environment:
+      - POSTGRES_HOST=pg
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=adminpassword
+    networks:
+      - kc-network
 
   pgpool:
-    image: bitnami/pgpool:4.5.0
+    image: {{ custom_image_repo }}bitnami/pgpool:4.5.0
     container_name: pgpool
     restart: always
     ports:
@@ -60,7 +71,7 @@ services:
 {% endfor %}
 
   keycloak:
-    image: quay.io/keycloak/keycloak:legacy
+    image: {{ custom_image_repo | default('quay.io/') }}keycloak/keycloak:legacy
     container_name: keycloak
     restart: always
     environment:
@@ -81,7 +92,7 @@ services:
 {% if use_custom_certs == "no" %}
 
   certbot:
-    image: certbot/certbot
+    image: {{ custom_image_repo }}certbot/certbot
     container_name: certbot
     restart:
     volumes:
@@ -99,13 +110,14 @@ services:
 {% endif %}
 
   nginx:
-    image: nginx
+    image: {{ custom_image_repo }}nginx:stable
     container_name: nginx
     restart: always
     ports:
       - "443:443"
       - "8080:8080"
       - "8443:8443"
+      - "9000:9000"
     depends_on:
       - keycloak
     networks:
@@ -122,7 +134,7 @@ services:
 networks:
   kc-network:
     driver: bridge
-{% if custom_docker_network_cidr %}
+{% if custom_docker_network_cidr is defined %}
     ipam:
       config:
         - subnet: {{ custom_docker_network_cidr }}
